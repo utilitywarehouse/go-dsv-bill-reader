@@ -4,7 +4,17 @@ Some files from Bill (`Comms.txt`) include multi-line strings that are not
 quoted. No D/CSV reader seemed to deal with these files so a custom library was
 necessary.
 
-See the `data.csv` file for an example of this problem.
+For example:
+
+```csv
+1000|first string|final string
+1001|second string
+that is multi-line|final string
+1002|third string|final string
+```
+
+Record `1001` contains a value that spans multiple lines but there are no quotes
+which is usually the strategy to handle multi-line values in DSV formats.
 
 ## Usage
 
