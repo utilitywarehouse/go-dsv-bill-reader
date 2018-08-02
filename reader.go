@@ -127,13 +127,13 @@ func (r *Reader) ReadAll() (records [][]string, err error) {
 func (r *Reader) readRecord(dst []string) (row []string, err error) {
 	ok := r.s.Scan()
 	if !ok {
-		err = errors.New("EOS")
+		err = io.EOF
 		return
 	}
 
 	row = strings.Split(r.s.Text(), string(r.Comma))
 
-	if r.FieldsPerRecord == 0 {
+	if r.FieldsPerRecord < 0 {
 		r.FieldsPerRecord = len(row)
 	} else {
 		for len(row) < r.FieldsPerRecord {
