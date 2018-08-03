@@ -24,7 +24,6 @@ reader with a few exceptions:
 - No quoting, because Bill files don't include quotes (from what I can tell)
 - No slice optimisation (yet)
 - No comments
-- Requires `FieldsPerRecord` to be set explicitly
 
 For example:
 
@@ -36,7 +35,6 @@ func main() {
     }
 
     cr := billdsv.NewReader(f)
-    cr.FieldsPerRecord = 29 // necessary
 
     for {
         row, err := cr.Read()
