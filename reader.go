@@ -64,22 +64,27 @@ type Reader struct {
 	s *bufio.Scanner
 
 	// numLine is the current line being read in the CSV file.
+	// nolint
 	numLine int
 
 	// rawBuffer is a line buffer only used by the readLine method.
+	// nolint
 	rawBuffer []byte
 
 	// recordBuffer holds the unescaped fields, one after another.
 	// The fields can be accessed by using the indexes in fieldIndexes.
 	// E.g., For the row `a,"b","c""d",e`, recordBuffer will contain `abc"de`
 	// and fieldIndexes will contain the indexes [1, 2, 5, 6].
+	// nolint
 	recordBuffer []byte
 
 	// fieldIndexes is an index of fields inside recordBuffer.
 	// The i'th field ends at offset fieldIndexes[i] in recordBuffer.
+	// nolint
 	fieldIndexes []int
 
 	// lastRecord is a record cache and only used when ReuseRecord == true.
+	// nolint
 	lastRecord []string
 }
 
@@ -125,6 +130,7 @@ func (r *Reader) ReadAll() (records [][]string, err error) {
 // long enough to satisfy the FieldsPerRecord value, the next line will be read
 // and its contents appended to the end of the last field of the previously read
 // line.
+// nolint:unparam
 func (r *Reader) readRecord(dst []string) (row []string, err error) {
 	ok := r.s.Scan()
 	if !ok {
