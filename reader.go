@@ -2,6 +2,7 @@ package billdsv
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -131,14 +132,14 @@ func (r *Reader) readRecord(dst []string) (row []string, err error) {
 		return
 	}
 
-	row = strings.Split(r.s.Text(), string(r.Comma))
+	row = strings.Split(string(bytes.Runes(r.s.Bytes())), string(r.Comma))
 
 	if r.FieldsPerRecord < 0 {
 		r.FieldsPerRecord = len(row)
 	} else {
 		for len(row) < r.FieldsPerRecord {
 			r.s.Scan()
-			overflow := strings.Split(r.s.Text(), string(r.Comma))
+			overflow := strings.Split(string(bytes.Runes(r.s.Bytes())), string(r.Comma))
 			row[len(row)-1] += "\n" + overflow[0]
 			row = append(row, overflow[1:]...)
 		}
