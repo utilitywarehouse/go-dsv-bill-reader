@@ -2,7 +2,6 @@ package billdsv
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -105,7 +104,13 @@ func NewReader(r io.Reader) *Reader {
 // If ReuseRecord is true, the returned slice may be shared
 // between multiple calls to Read.
 func (r *Reader) Read() (record []string, err error) {
-	return r.readRecord(nil)
+	if r.ReuseRecord {
+		record, err = r.readRecord(r.lastRecord)
+		r.lastRecord = record
+	} else {
+		record, err = r.readRecord(nil)
+	}
+	return
 }
 
 // ReadAll reads all the remaining records from r.
@@ -131,25 +136,25 @@ func (r *Reader) ReadAll() (records [][]string, err error) {
 // and its contents appended to the end of the last field of the previously read
 // line.
 // nolint:unparam
-func (r *Reader) readRecord(dst []string) (row []string, err error) {
+func (r *Reader) readRecord(dst []string) ([]string, error) {
 	ok := r.s.Scan()
 	if !ok {
-		err = io.EOF
-		return
+		return nil, io.EOF
 	}
 
-	row = strings.Split(string(bytes.Runes(r.s.Bytes())), string(r.Comma))
+	dst = strings.Split(r.s.Text(), string(r.Comma))
 
 	if r.FieldsPerRecord < 0 {
-		r.FieldsPerRecord = len(row)
+		r.FieldsPerRecord = len(dst)
 	} else {
-		for len(row) < r.FieldsPerRecord {
+		for len(dst) < r.FieldsPerRecord {
 			r.s.Scan()
-			overflow := strings.Split(string(bytes.Runes(r.s.Bytes())), string(r.Comma))
-			row[len(row)-1] += "\n" + overflow[0]
-			row = append(row, overflow[1:]...)
+			overflow := strings.Split(r.s.Text(), string(r.Comma))
+			dst[len(dst)-1] += fmt.Sprintf("\n%s", overflow[0])
+			dst = append(dst, overflow[1:]...)
 		}
 	}
 
-	return
+	r.numLine++
+	return dst, nil
 }
