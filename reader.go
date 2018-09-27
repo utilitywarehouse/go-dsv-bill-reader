@@ -1,160 +1,123 @@
 package billdsv
 
 import (
-	"bufio"
-	"errors"
-	"fmt"
 	"io"
-	"strings"
-)
 
-// A ParseError is returned for parsing errors.
-// Line numbers are 1-indexed and columns are 0-indexed.
-type ParseError struct {
-	StartLine int   // Line   where the record starts
-	Line      int   // Line where the error occurred
-	Column    int   // Column (rune index) where the error occurred
-	Err       error // The actual error
-}
-
-func (e *ParseError) Error() string {
-	if e.Err == ErrFieldCount {
-		return fmt.Sprintf("record on line %d: %v", e.Line, e.Err)
-	}
-	if e.StartLine != e.Line {
-		return fmt.Sprintf("record on line %d; parse error on line %d, column %d: %v", e.StartLine, e.Line, e.Column, e.Err)
-	}
-	return fmt.Sprintf("parse error on line %d, column %d: %v", e.Line, e.Column, e.Err)
-}
-
-// These are the errors that can be returned in ParseError.Err.
-var (
-	ErrTrailingComma = errors.New("extra delimiter at end of line") // Deprecated: No longer used.
-	ErrBareQuote     = errors.New("bare \" in non-quoted-field")
-	ErrQuote         = errors.New("extraneous or missing \" in quoted-field")
-	ErrFieldCount    = errors.New("wrong number of fields")
+	"github.com/pkg/errors"
 )
 
 // Reader implements a DSV reader that reads the pipe separated values
 // that Bill outputs.
 type Reader struct {
-	// Comma is the field delimiter.
-	// It is set to comma (',') by NewReader.
-	// Comma must be a valid rune and must not be \r, \n,
-	// or the Unicode replacement character (0xFFFD).
-	Comma rune
+	Separator   byte
+	SkipHeading bool
+	BufferSize  int
 
-	// FieldsPerRecord is the number of expected fields per record.
-	// If FieldsPerRecord is positive, Read requires each record to
-	// have the given number of fields. If FieldsPerRecord is 0, Read sets it to
-	// the number of fields in the first record, so that future records must
-	// have the same field count.
-	FieldsPerRecord int
-
-	// Comment is unused in this implementation
-	Comment rune
-	// ReuseRecord is unused in this implementation
-	ReuseRecord bool
-	// LazyQuotes is unused in this implementation
-	LazyQuotes bool
-	// TrimLeadingSpace is unused in this implementation
-	TrimLeadingSpace bool
-
-	s *bufio.Scanner
-
-	// numLine is the current line being read in the CSV file.
-	// nolint
-	numLine int
-
-	// rawBuffer is a line buffer only used by the readLine method.
-	// nolint
-	rawBuffer []byte
-
-	// recordBuffer holds the unescaped fields, one after another.
-	// The fields can be accessed by using the indexes in fieldIndexes.
-	// E.g., For the row `a,"b","c""d",e`, recordBuffer will contain `abc"de`
-	// and fieldIndexes will contain the indexes [1, 2, 5, 6].
-	// nolint
-	recordBuffer []byte
-
-	// fieldIndexes is an index of fields inside recordBuffer.
-	// The i'th field ends at offset fieldIndexes[i] in recordBuffer.
-	// nolint
-	fieldIndexes []int
-
-	// lastRecord is a record cache and only used when ReuseRecord == true.
-	// nolint
-	lastRecord []string
+	r         io.Reader
+	fields    int
+	rdBuffer  []byte
+	wrBuffer  []byte
+	rowBuffer [][]byte
 }
 
-// NewReader returns a new Reader that reads from r.
-func NewReader(r io.Reader) *Reader {
+var defaultBufferSize = 1024
+
+// NewReader returns a new Reader that reads from r. The number of expected
+// fields per row is required so the parser can safely deal with fields
+// containing line breaks. The buffer size may be specified post-instantiate
+// but the default should be fine for most cases.
+func NewReader(r io.Reader, fields int) *Reader {
 	return &Reader{
-		s:     bufio.NewScanner(r),
-		Comma: ',',
+		Separator:  '|',
+		BufferSize: defaultBufferSize,
+
+		// all allocations happen at this stage, this includes a buffer to
+		// stream chunks of data into, a buffer to stage field data into and a
+		// buffer of fields to stage rows before calling the callback.
+		r:         r,
+		fields:    fields,
+		rdBuffer:  make([]byte, defaultBufferSize),
+		wrBuffer:  make([]byte, 1024),
+		rowBuffer: make([][]byte, fields),
 	}
 }
 
-// Read reads one record (a slice of fields) from r.
-// If the record has an unexpected number of fields,
-// Read returns the record along with the error ErrFieldCount.
-// Except for that case, Read always returns either a non-nil
-// record or a non-nil error, but not both.
-// If there is no data left to be read, Read returns nil, io.EOF.
-// If ReuseRecord is true, the returned slice may be shared
-// between multiple calls to Read.
-func (r *Reader) Read() (record []string, err error) {
-	if r.ReuseRecord {
-		record, err = r.readRecord(r.lastRecord)
-		r.lastRecord = record
-	} else {
-		record, err = r.readRecord(nil)
+// ReadAll reads all records and passes them to the specified function. This
+// function will make no heap allocations in best case scenarios. The only time
+// this function will allocate is if a field exceeds the default field buffer
+// size of 1024, in which case the struct field `wrBuffer` will be resized to
+// 1.5x the size. The other two potential allocation spots, are the two `append`
+// calls in the switch blocks, these are allocated lazily as well as if the
+// `rowBuffer` cell is at capacity and requires resizing to fit the new data.
+func (r *Reader) ReadAll(function func([][]byte)) (err error) {
+	if r.fields == 0 {
+		return errors.New("fields is set to zero")
 	}
-	return
-}
+	// the buffer size must be able to accommodate at least `n` fields as well as
+	// `n-1` field separators.
+	if r.fields > r.BufferSize/2 {
+		return errors.New("buffer size isn't large enough for the amount of specified fields")
+	}
 
-// ReadAll reads all the remaining records from r.
-// Each record is a slice of fields.
-// A successful call returns err == nil, not err == io.EOF. Because ReadAll is
-// defined to read until EOF, it does not treat end of file as an error to be
-// reported.
-func (r *Reader) ReadAll() (records [][]string, err error) {
+	var (
+		rdBufferLen int
+		rdIdx       int
+		wrIdx       int
+		fields      int
+		rows        int
+	)
+
 	for {
-		record, err := r.readRecord(nil)
-		if err == io.EOF {
-			return records, nil
+		if rdBufferLen, err = r.r.Read(r.rdBuffer); err == io.EOF {
+			return nil
+		} else if err != nil {
+			return err
 		}
-		if err != nil {
-			return nil, err
+		rdIdx = 0
+
+		if rows == 0 && r.SkipHeading {
+			for ; rdIdx < rdBufferLen; rdIdx++ {
+				if r.rdBuffer[rdIdx] == '\n' {
+					rows = 1
+					break
+				}
+			}
 		}
-		records = append(records, record)
-	}
-}
 
-// readRecord reads a single record from the file. If the line it read was not
-// long enough to satisfy the FieldsPerRecord value, the next line will be read
-// and its contents appended to the end of the last field of the previously read
-// line.
-// nolint:unparam
-func (r *Reader) readRecord(dst []string) ([]string, error) {
-	ok := r.s.Scan()
-	if !ok {
-		return nil, io.EOF
-	}
+		for ; rdIdx < rdBufferLen; rdIdx++ {
+			switch r.rdBuffer[rdIdx] {
+			case r.Separator:
+				if fields >= len(r.rowBuffer) {
+					return errors.Errorf("on row %d, expected %d fields but read an extra field", rows, fields)
+				}
+				r.rowBuffer[fields] = r.rowBuffer[fields][:0]
+				r.rowBuffer[fields] = append(r.rowBuffer[fields], r.wrBuffer...)
+				r.rowBuffer[fields] = r.rowBuffer[fields][0:wrIdx]
+				wrIdx = 0
+				fields++
 
-	dst = strings.Split(r.s.Text(), string(r.Comma))
+			case '\n':
+				if fields == r.fields-1 {
+					r.rowBuffer[fields] = r.rowBuffer[fields][:0]
+					r.rowBuffer[fields] = append(r.rowBuffer[fields], r.wrBuffer...)
+					r.rowBuffer[fields] = r.rowBuffer[fields][0:wrIdx]
+					wrIdx = 0
+					fields = 0
 
-	if r.FieldsPerRecord < 0 {
-		r.FieldsPerRecord = len(dst)
-	} else {
-		for len(dst) < r.FieldsPerRecord {
-			r.s.Scan()
-			overflow := strings.Split(r.s.Text(), string(r.Comma))
-			dst[len(dst)-1] += fmt.Sprintf("\n%s", overflow[0])
-			dst = append(dst, overflow[1:]...)
+					function(r.rowBuffer)
+					rows++
+					continue
+				}
+
+				fallthrough
+
+			default:
+				if wrIdx >= len(r.wrBuffer) {
+					r.wrBuffer = append(r.wrBuffer, make([]byte, int(float64(len(r.wrBuffer))*1.5))...)
+				}
+				r.wrBuffer[wrIdx] = r.rdBuffer[rdIdx]
+				wrIdx++
+			}
 		}
 	}
-
-	r.numLine++
-	return dst, nil
 }

@@ -7,35 +7,26 @@ import (
 	"testing"
 )
 
-var e [][]string
-
-func handler(row []string) {
-	e = append(e, row)
-}
+var e [][]byte
 
 func BenchmarkReader(b *testing.B) {
+	r := make([]*Reader, b.N)
+	for i := 0; i < b.N; i++ {
+		r[i] = NewReader(generateCSV(1000000, 134), 134)
+	}
+
 	b.ReportAllocs()
-
-	csv := getCsv(10000, 134)
-	r := NewReader(csv)
-	r.ReuseRecord = true
-
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		for i := 0; i < 10000; i++ {
-			s, err := r.Read()
-			if err != nil {
-				if err == io.EOF {
-					return
-				}
-				b.Error(err)
-			}
-			handler(s)
-		}
+		r[i].ReadAll(func(row [][]byte) {
+			e = row
+		})
 	}
 }
 
-func getCsv(rows int, cols int) (r io.Reader) {
+// returns a reader that produces a CSV of the specified rows and columns filled
+// with placeholder data.
+func generateCSV(rows int, cols int) (r io.Reader) {
 	r, w := io.Pipe()
 	go func() {
 		for i := 0; i < rows; i++ {
@@ -43,7 +34,7 @@ func getCsv(rows int, cols int) (r io.Reader) {
 			for j := 0; j < cols; j++ {
 				cells[j] = fmt.Sprintf("field %d", j)
 			}
-			_, err := w.Write([]byte(strings.Join(cells, ",") + "\n"))
+			_, err := w.Write([]byte(strings.Join(cells, "|") + "\n"))
 			if err != nil {
 				panic(err)
 			}

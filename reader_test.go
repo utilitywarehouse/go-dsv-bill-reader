@@ -5,36 +5,37 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/bmizerany/assert"
 )
 
 func TestReader1(t *testing.T) {
-	f := strings.NewReader(`1000|first string|final string
-1001|second string
+	f := strings.NewReader(`1a0|first string|final string
+2b1|second string
 that is multi-line
 |final string
-1002|third string|final string
+3c2|third string|final string
 `)
 
 	want := [][]string{
-		{"1000", "first string", "final string"},
-		{"1001", "second string\nthat is multi-line\n", "final string"},
-		{"1002", "third string", "final string"},
+		{"1a0", "first string", "final string"},
+		{"2b1", "second string\nthat is multi-line\n", "final string"},
+		{"3c2", "third string", "final string"},
 	}
 
 	got := [][]string{}
 
-	cr := NewReader(f)
-	cr.Comma = '|'
-	cr.FieldsPerRecord = 3
-	for {
-		row, err := cr.Read()
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
-		got = append(got, row)
+	cr := NewReader(f, 3)
+
+	err := cr.ReadAll(func(row [][]byte) {
 		fmt.Println(truncateStrings(20, row))
+		rowStrings := make([]string, 3)
+		for i, c := range row {
+			rowStrings[i] = string(c)
+		}
+		got = append(got, rowStrings)
+	})
+	if err != nil {
+		t.Error(err)
 	}
 
 	assert.Equal(t, want, got)
@@ -55,17 +56,18 @@ that is multi-line|final string
 
 	got := [][]string{}
 
-	cr := NewReader(f)
-	cr.Comma = '|'
-	cr.FieldsPerRecord = 3
-	for {
-		row, err := cr.Read()
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
-		got = append(got, row)
+	cr := NewReader(f, 3)
+
+	err := cr.ReadAll(func(row [][]byte) {
 		fmt.Println(truncateStrings(20, row))
+		rowStrings := make([]string, 3)
+		for i, c := range row {
+			rowStrings[i] = string(c)
+		}
+		got = append(got, rowStrings)
+	})
+	if err != nil {
+		t.Error(err)
 	}
 
 	assert.Equal(t, want, got)
@@ -145,28 +147,28 @@ func TestReader3(t *testing.T) {
 
 	got := [][]string{}
 
-	cr := NewReader(f)
-	cr.Comma = '|'
-	cr.FieldsPerRecord = -1
-	for {
-		row, err := cr.Read()
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
-		got = append(got, row)
+	cr := NewReader(f, 29)
+	err := cr.ReadAll(func(row [][]byte) {
 		fmt.Println(truncateStrings(20, row))
+		rowStrings := make([]string, 29)
+		for i, c := range row {
+			rowStrings[i] = string(c)
+		}
+		got = append(got, rowStrings)
+	})
+	if err != nil {
+		t.Error(err)
 	}
 
 	assert.Equal(t, want, got)
 }
 
-func truncateStrings(limit int, in []string) string {
+func truncateStrings(limit int, in [][]byte) string {
 	sb := strings.Builder{}
 	sb.WriteString("[")
-	for i, s := range in {
-		s = strings.Replace(s, "\n", `\n`, -1)
-		// sb.WriteString("\t")
+	for i, b := range in {
+		s := strings.Replace(string(b), "\n", `\n`, -1)
+		sb.WriteString("\t")
 		sb.WriteString(fmt.Sprintf(`%d:"`, i))
 		if len(s) > limit {
 			sb.WriteString(s[:limit] + "...")
@@ -179,7 +181,7 @@ func truncateStrings(limit int, in []string) string {
 			sb.WriteString(", ")
 		}
 
-		// sb.WriteString("\n")
+		sb.WriteString("\n")
 	}
 	sb.WriteString("]")
 	return sb.String()
