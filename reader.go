@@ -69,7 +69,9 @@ func (r *Reader) ReadAll(function func([][]byte)) (err error) {
 
 	for {
 		if rdBufferLen, err = r.r.Read(r.rdBuffer); err == io.EOF {
-			break
+			if rdBufferLen == 0 {
+				break
+			}
 		} else if err != nil {
 			return err
 		}
