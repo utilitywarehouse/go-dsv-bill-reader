@@ -69,7 +69,7 @@ func (r *Reader) ReadAll(function func([][]byte)) (err error) {
 
 	for {
 		if rdBufferLen, err = r.r.Read(r.rdBuffer); err == io.EOF {
-			return nil
+			break
 		} else if err != nil {
 			return err
 		}
@@ -121,4 +121,14 @@ func (r *Reader) ReadAll(function func([][]byte)) (err error) {
 			}
 		}
 	}
+
+	if wrIdx != 0 && r.wrBuffer != nil {
+		r.rowBuffer[fields] = r.rowBuffer[fields][:0]
+		r.rowBuffer[fields] = append(r.rowBuffer[fields], r.wrBuffer...)
+		r.rowBuffer[fields] = r.rowBuffer[fields][0:wrIdx]
+
+		function(r.rowBuffer)
+	}
+
+	return nil
 }
