@@ -163,6 +163,37 @@ func TestReader3(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
+func TestReader4(t *testing.T) {
+	f := strings.NewReader(`A|B|C
+str1|123|str2
+str3|456|str"4
+`)
+
+	want := [][]string{
+		{"str1", "123", "str2"},
+		{"str3", "456", "str\"4"},
+	}
+
+	got := [][]string{}
+
+	cr := NewReader(f, 3)
+	cr.SkipHeading = true
+
+	err := cr.ReadAll(func(row [][]byte) {
+		fmt.Println(truncateStrings(20, row))
+		rowStrings := make([]string, 3)
+		for i, c := range row {
+			rowStrings[i] = string(c)
+		}
+		got = append(got, rowStrings)
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	assert.Equal(t, want, got)
+}
+
 func truncateStrings(limit int, in [][]byte) string {
 	sb := strings.Builder{}
 	sb.WriteString("[")

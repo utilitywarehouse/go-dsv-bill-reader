@@ -79,6 +79,7 @@ func (r *Reader) ReadAll(function func([][]byte)) (err error) {
 			for ; rdIdx < rdBufferLen; rdIdx++ {
 				if r.rdBuffer[rdIdx] == '\n' {
 					rows = 1
+					rdIdx++
 					break
 				}
 			}
