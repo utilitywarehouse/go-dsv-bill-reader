@@ -124,7 +124,7 @@ func (r *Reader) ReadAll(function func([][]byte)) (err error) {
 		}
 	}
 
-	if wrIdx != 0 && r.wrBuffer != nil {
+	if (wrIdx != 0 && r.wrBuffer != nil) || (fields == r.fields-1 && wrIdx == 0) {
 		r.rowBuffer[fields] = r.rowBuffer[fields][:0]
 		r.rowBuffer[fields] = append(r.rowBuffer[fields], r.wrBuffer...)
 		r.rowBuffer[fields] = r.rowBuffer[fields][0:wrIdx]
