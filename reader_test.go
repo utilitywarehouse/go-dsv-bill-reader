@@ -331,6 +331,34 @@ func TestReader7(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
+func TestReader8(t *testing.T) {
+	f := strings.NewReader("Content ID,Content name,User ID,Email,Username,Last login,Last activity,Registration date,Role,Name,Given name,Family name,PartnerID,Date course started,SCORM course status,Test score,Session time,Time spent on test,Date course completed,Approval date\n\r,,,,,,,,,,,,,,not started,,,,,\r\n")
+
+	want := [][]string{
+		{"", "", "", "", "", "", "", "", "", "", "", "", "", "", "not started", "", "", "", "", ""},
+	}
+
+	got := [][]string{}
+
+	cr := NewReader(f, 20)
+	cr.Separator = ','
+	cr.SkipHeading = true
+
+	err := cr.ReadAll(func(row [][]byte) {
+		fmt.Println(truncateStrings(20, row))
+		rowStrings := make([]string, 20)
+		for i, c := range row {
+			rowStrings[i] = string(c)
+		}
+		got = append(got, rowStrings)
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	assert.Equal(t, want, got)
+}
+
 func truncateStrings(limit int, in [][]byte) string {
 	sb := strings.Builder{}
 	sb.WriteString("[")

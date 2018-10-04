@@ -99,6 +99,9 @@ func (r *Reader) ReadAll(function func([][]byte)) (err error) {
 				wrIdx = 0
 				fields++
 
+			case '\r':
+				continue
+
 			case '\n':
 				if fields == r.fields-1 {
 					r.rowBuffer[fields] = r.rowBuffer[fields][:0]
