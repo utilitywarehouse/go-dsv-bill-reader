@@ -12,7 +12,7 @@ var e [][]byte
 func BenchmarkReader(b *testing.B) {
 	r := make([]*Reader, b.N)
 	for i := 0; i < b.N; i++ {
-		r[i] = NewReader(generateCSV(1000000, 134), 134)
+		r[i] = NewReader(generateCSV(1000000, 134), 134, DefaultBufferSize)
 	}
 
 	b.ReportAllocs()

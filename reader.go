@@ -21,7 +21,7 @@ type Reader struct {
 	rowBuffer [][]byte
 }
 
-var defaultBufferSize = 1024
+var DefaultBufferSize = 1024
 
 // NewReader returns a new Reader that reads from r. The number of expected
 // fields per row can be specified so the parser can safely deal with fields
@@ -29,17 +29,17 @@ var defaultBufferSize = 1024
 // but the default should be fine for most cases. If fields is left at zero, the
 // first line will be used to set the expected field count for the rest of the
 // document. This means that if the CSV is malformed
-func NewReader(r io.Reader, fields int) *Reader {
+func NewReader(r io.Reader, fields, bufferSize int) *Reader {
 	return &Reader{
 		Separator:  '|',
-		BufferSize: defaultBufferSize,
+		BufferSize: bufferSize,
 
 		// all allocations happen at this stage, this includes a buffer to
 		// stream chunks of data into, a buffer to stage field data into and a
 		// buffer of fields to stage rows before calling the callback.
 		r:         r,
 		fields:    fields,
-		rdBuffer:  make([]byte, defaultBufferSize),
+		rdBuffer:  make([]byte, bufferSize),
 		wrBuffer:  make([]byte, 1024),
 		rowBuffer: make([][]byte, fields),
 	}

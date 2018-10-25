@@ -24,7 +24,7 @@ that is multi-line
 
 	got := [][]string{}
 
-	cr := NewReader(f, 3)
+	cr := NewReader(f, 3, DefaultBufferSize)
 
 	err := cr.ReadAll(func(row [][]byte) {
 		fmt.Println(truncateStrings(20, row))
@@ -56,7 +56,7 @@ that is multi-line|final string
 
 	got := [][]string{}
 
-	cr := NewReader(f, 3)
+	cr := NewReader(f, 3, DefaultBufferSize)
 
 	err := cr.ReadAll(func(row [][]byte) {
 		fmt.Println(truncateStrings(20, row))
@@ -147,7 +147,7 @@ func TestReader3(t *testing.T) {
 
 	got := [][]string{}
 
-	cr := NewReader(f, 29)
+	cr := NewReader(f, 29, DefaultBufferSize)
 	err := cr.ReadAll(func(row [][]byte) {
 		fmt.Println(truncateStrings(20, row))
 		rowStrings := make([]string, 29)
@@ -176,7 +176,7 @@ str3|456|str"4
 
 	got := [][]string{}
 
-	cr := NewReader(f, 3)
+	cr := NewReader(f, 3, DefaultBufferSize)
 	cr.SkipHeading = true
 
 	err := cr.ReadAll(func(row [][]byte) {
@@ -206,7 +206,7 @@ str3|456|str"4`)
 
 	got := [][]string{}
 
-	cr := NewReader(f, 3)
+	cr := NewReader(f, 3, DefaultBufferSize)
 	cr.SkipHeading = true
 
 	err := cr.ReadAll(func(row [][]byte) {
@@ -284,7 +284,7 @@ func TestReader6(t *testing.T) {
 
 	got := [][]string{}
 
-	cr := NewReader(f, 17)
+	cr := NewReader(f, 17, DefaultBufferSize)
 	cr.SkipHeading = true
 
 	err := cr.ReadAll(func(row [][]byte) {
@@ -312,7 +312,7 @@ func TestReader7(t *testing.T) {
 
 	got := [][]string{}
 
-	cr := NewReader(f, 20)
+	cr := NewReader(f, 20, DefaultBufferSize)
 	cr.Separator = ','
 	cr.SkipHeading = true
 
@@ -340,7 +340,7 @@ func TestReader8(t *testing.T) {
 
 	got := [][]string{}
 
-	cr := NewReader(f, 20)
+	cr := NewReader(f, 20, DefaultBufferSize)
 	cr.Separator = ','
 	cr.SkipHeading = true
 
@@ -419,12 +419,42 @@ func TestReader9(t *testing.T) {
 
 	got := [][]string{}
 
-	cr := NewReader(f, 0)
+	cr := NewReader(f, 0, DefaultBufferSize)
 	cr.SkipHeading = true
 
 	err := cr.ReadAll(func(row [][]byte) {
 		fmt.Println(truncateStrings(20, row))
 		rowStrings := make([]string, 17)
+		for i, c := range row {
+			rowStrings[i] = string(c)
+		}
+		got = append(got, rowStrings)
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	assert.Equal(t, want, got)
+}
+
+func TestReader10(t *testing.T) {
+	f := strings.NewReader(`CustAccountNo|CustName|CustContTitle|CustContInitials|CustContFirstnam|CustContSurname|CustContJobTitle|CustDOB|CustAdd1|CustAdd2|CustAdd3|CustAdd4|CustCounty|CustPostCode|CustPhone|CustFax|CustMobile|CustEmail|CustInvTitle|CustInvInitials|CustInvFirstname|CustInvSurname|CustInvContJob|CustInvDOB|CustInvAdd1|CustInvAdd2|CustInvAdd3|CustInvAdd4|CustInvCounty|CustInvPostCode|CustInvPhone|CustInvFax|CustInvMobile|CustInvEmail|CustBillingGroup|CustNextBillNo|CustLastBillDate|CustPaidFirstBil|CustBillDelivery|CustCardCashBak|CustCGACVD|CustGoodwillCred|CustSpareN4|CustDeposits|CustSurcharge|CustAutoBarFlag|CustAutoBarDate|CustAutoBarEnd|CustRating|CustItemiseCalls|CustItemisePence|CustExecID|CustPlaceExecID|CustClubLevel|CustDateEntered|CustLiveDate|CustEndDate|CustBankSort|CustBankAccNo|CustBankAccName|CustBankDDRef|CustPayMethod|CustAuddisDate|CustStatus|Cust100PoundFlag|CustOutstanding|CustLetterFlag|CustCorporate|CustCorpPackage|CustDiscount|CustCGBPaid|CustHighIncome|CustCGBClaw|CustBDBPaid|CustvExecID|CustServices|CustConnServices|CustDebtDate|CustDebtAgency|CustBillSuppress|Cust2CGBPaid|CustCCNumber|CustCCType|CustCCStartDate|CustCCEndDate|CustCCIssue|CustFreeCalls|CustSpecialNeeds|CustOriginalExec|CustPSR|CustPassword|CustSPMinMonthly|CustDeliverTo|CustEnteredBy|CustSentTsCs|CustSentGOCD|CustNoMarketing|CustToTPS|CustFromAdvert|CustExportFlag|CustClubJoinDate|CustClubFee|CustClubDiscount|CustIsHomeMover|CustCashBack|CustCorpUser|CustCommitment01|CustCommitment02|CustCommitment03|CustDebtServices|CustIsABusiness|CustSpareD1|CustSpareD2|CustClubUpgrade|CustReferral|CustRefReward|CustRefDiscount|CustRefCount|CustOwnOrTenant|CustSpareN1|CustEscalation|CustNewTenant|CustIsCOU|Cust100PoundDate|CustEmailContact|CustEmailDate|CustMyAccount|CustSpareD1|CustSpareD2|CustVoucher|CustShopperRef|CustSupportingID|CustVirtExecID|CustRecUniqueSys
+|||||||1899-12-30||||||||||||||||1899-12-30|||||||||||0|0|1899-12-30|1899-12-30|0|0|0|0|1899-12-30|0|0||1899-12-30|1899-12-30|0|0|0|||0|1899-12-30|1899-12-30|1899-12-30|--|XXXX0000|||C|1900-01-01|E|0|0|0|||0|1899-12-30|0||1899-12-30||00000000000000000000|00000000000000000000|1899-12-30||0|1899-12-30||1|||0|0|0||||0|1||1899-12-30|1899-12-30||1899-12-30|.|0|1899-12-30|0|0||||0|0|0|||1899-12-30|1899-12-30|1899-12-30|||0|0||0||0||1899-12-30|00000000000000000000|1899-12-30|1899-12-30|1899-12-30|1899-12-30|||||0
+`)
+
+	want := [][]string{
+		{"", "", "", "", "", "", "", "1899-12-30", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "1899-12-30", "", "", "", "", "", "", "", "", "", "", "0", "0", "1899-12-30", "1899-12-30", "0", "0", "0", "0", "1899-12-30", "0", "0", "", "1899-12-30", "1899-12-30", "0", "0", "0", "", "", "0", "1899-12-30", "1899-12-30", "1899-12-30", "--", "XXXX0000", "", "", "C", "1900-01-01", "E", "0", "0", "0", "", "", "0", "1899-12-30", "0", "", "1899-12-30", "", "00000000000000000000", "00000000000000000000", "1899-12-30", "", "0", "1899-12-30", "", "1", "", "", "0", "0", "0", "", "", "", "0", "1", "", "1899-12-30", "1899-12-30", "", "1899-12-30", ".", "0", "1899-12-30", "0", "0", "", "", "", "0", "0", "0", "", "", "1899-12-30", "1899-12-30", "1899-12-30", "", "", "0", "0", "", "0", "", "0", "", "1899-12-30", "00000000000000000000", "1899-12-30", "1899-12-30", "1899-12-30", "1899-12-30", "", "", "", "", "0"},
+	}
+
+	got := [][]string{}
+
+	cr := NewReader(f, 0, 2048)
+	cr.SkipHeading = true
+	cr.BufferSize = 2048
+
+	err := cr.ReadAll(func(row [][]byte) {
+		fmt.Println(truncateStrings(20, row))
+		rowStrings := make([]string, 134)
 		for i, c := range row {
 			rowStrings[i] = string(c)
 		}
