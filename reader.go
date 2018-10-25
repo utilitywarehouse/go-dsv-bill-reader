@@ -1,6 +1,7 @@
 package billdsv
 
 import (
+	"bytes"
 	"io"
 
 	"github.com/pkg/errors"
@@ -23,9 +24,11 @@ type Reader struct {
 var defaultBufferSize = 1024
 
 // NewReader returns a new Reader that reads from r. The number of expected
-// fields per row is required so the parser can safely deal with fields
+// fields per row can be specified so the parser can safely deal with fields
 // containing line breaks. The buffer size may be specified post-instantiate
-// but the default should be fine for most cases.
+// but the default should be fine for most cases. If fields is left at zero, the
+// first line will be used to set the expected field count for the rest of the
+// document. This means that if the CSV is malformed
 func NewReader(r io.Reader, fields int) *Reader {
 	return &Reader{
 		Separator:  '|',
@@ -50,9 +53,6 @@ func NewReader(r io.Reader, fields int) *Reader {
 // calls in the switch blocks, these are allocated lazily as well as if the
 // `rowBuffer` cell is at capacity and requires resizing to fit the new data.
 func (r *Reader) ReadAll(function func([][]byte)) (err error) {
-	if r.fields == 0 {
-		return errors.New("fields is set to zero")
-	}
 	// the buffer size must be able to accommodate at least `n` fields as well as
 	// `n-1` field separators.
 	if r.fields > r.BufferSize/2 {
@@ -78,8 +78,22 @@ func (r *Reader) ReadAll(function func([][]byte)) (err error) {
 		rdIdx = 0
 
 		if rows == 0 && r.SkipHeading {
+			// consume the heading bytes and discard
+			// counting the field headings and using the count if necessary
 			for ; rdIdx < rdBufferLen; rdIdx++ {
 				if r.rdBuffer[rdIdx] == '\n' {
+					headings := len(bytes.Split(r.rdBuffer[:rdIdx], []byte{r.Separator}))
+					if r.fields == 0 {
+						// since the field count was calculated at "runtime"
+						// it needs to allocate the row buffer because the
+						// NewReader function would have allocated it with 0
+						r.fields = headings
+						r.rowBuffer = make([][]byte, headings)
+					} else {
+						if headings != r.fields {
+							return errors.New("declared fields does not match headings")
+						}
+					}
 					rows = 1
 					rdIdx++
 					break
@@ -91,7 +105,7 @@ func (r *Reader) ReadAll(function func([][]byte)) (err error) {
 			switch r.rdBuffer[rdIdx] {
 			case r.Separator:
 				if fields >= len(r.rowBuffer) {
-					return errors.Errorf("on row %d, expected %d fields but read an extra field", rows, fields)
+					return errors.Errorf("on row %d, expected %d fields but read an extra field", rows, len(r.rowBuffer))
 				}
 				r.rowBuffer[fields] = r.rowBuffer[fields][:0]
 				r.rowBuffer[fields] = append(r.rowBuffer[fields], r.wrBuffer...)
