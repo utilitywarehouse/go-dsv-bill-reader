@@ -52,7 +52,7 @@ func NewReader(r io.Reader, fields, bufferSize int) *Reader {
 // 1.5x the size. The other two potential allocation spots, are the two `append`
 // calls in the switch blocks, these are allocated lazily as well as if the
 // `rowBuffer` cell is at capacity and requires resizing to fit the new data.
-func (r *Reader) ReadAll(function func([][]byte)) (err error) {
+func (r *Reader) ReadAll(function func([][]byte) error) (err error) {
 	// the buffer size must be able to accommodate at least `n` fields as well as
 	// `n-1` field separators.
 	if r.fields > r.BufferSize/2 {
@@ -124,7 +124,9 @@ func (r *Reader) ReadAll(function func([][]byte)) (err error) {
 					wrIdx = 0
 					fields = 0
 
-					function(r.rowBuffer)
+					if err := function(r.rowBuffer); err != nil {
+						return err
+					}
 					rows++
 					continue
 				}
