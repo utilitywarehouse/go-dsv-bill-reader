@@ -1,4 +1,4 @@
-module github.com/utilitywarehouse/go-dsv-bill-reader
+module github.com/utilitywarehouse/go-dsv-bill-reader/v2
 
 require (
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869
